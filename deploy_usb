@@ -1,0 +1,2 @@
+# pico2w
+cp build/pico-weather-base-station.uf2 /media/pi/RP2350

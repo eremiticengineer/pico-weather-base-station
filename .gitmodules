@@ -1,0 +1,9 @@
+[submodule "lib/FreeRTOS-Kernel"]
+	path = lib/FreeRTOS-Kernel
+	url = https://github.com/FreeRTOS/FreeRTOS-Kernel.git
+[submodule "pico-https"]
+	path = lib/pico-https
+	url = https://github.com/eremiticengineer/pico-https
+[submodule "pico-lora"]
+	path = lib/pico-lora
+	url = https://github.com/eremiticengineer/pico-lora
