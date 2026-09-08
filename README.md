@@ -11,6 +11,7 @@ git clone https://github.com/eremiticengineer/pico-weather-base-station
 cd pico-weather-base-station
 git submodule update --init --progress --jobs 4
 git -C lib/FreeRTOS-Kernel submodule update --init --recursive --progress
+cp src/secrets.example.hpp src/secrets.hpp
 ./build_project
 ```
 
