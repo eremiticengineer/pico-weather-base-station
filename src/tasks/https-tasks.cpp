@@ -8,9 +8,11 @@ void https_post_task(void *pvParameters) {
     while (true) {
         if (xQueueReceive(pParam->https_post_queue, &message, portMAX_DELAY)) {
             printf("posting to website...\n");
+            printf("%s\n", message.json);
 
             if (!pParam->https_client->post(message.json)) {
                 printf("POST failed: %s\n", pParam->https_client->errorMessage().c_str());
+                printf("POST failed: %s\n", pParam->https_client->responseBody().c_str());
             } else {
                 printf("POST successful: HTTP %d\n", pParam->https_client->statusCode());
             }
