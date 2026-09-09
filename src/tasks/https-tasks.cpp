@@ -3,11 +3,6 @@
 void https_post_task(void *pvParameters) {
     HttpsTaskParams* pParam = static_cast<HttpsTaskParams*>(pvParameters);
 
-    if (!pParam->https_client->initialiseWifi(pParam->wifi_ssid, pParam->wifi_password)) {
-        printf("WiFi failed: %s\n", pParam->https_client->errorMessage().c_str());
-        while (true) { tight_loop_contents(); }
-    }
-
     HttpsPostMessage message;
 
     while (true) {

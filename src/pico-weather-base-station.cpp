@@ -6,6 +6,7 @@
 
 #include "secrets.hpp"
 
+#include "tasks/wifi-tasks.hpp"
 #include "tasks/lora-tasks.hpp"
 #include "tasks/https-tasks.hpp"
 
@@ -17,6 +18,22 @@ int main( void )
     stdio_init_all();
 
     sleep_ms(2000);
+
+    constexpr uint32_t WIFI_CONNECT_TIMEOUT_MS = 30000;
+    constexpr uint32_t WIFI_RECONNECT_INTERVAL_MS = 5000;
+    constexpr TickType_t WIFI_PROCESS_INTERVAL = pdMS_TO_TICKS(1000);
+    pico_wifi::PicoWifi wifi(
+        WIFI_SSID,
+        WIFI_PASSWORD,
+        CYW43_AUTH_WPA2_AES_PSK,
+        WIFI_CONNECT_TIMEOUT_MS,
+        WIFI_RECONNECT_INTERVAL_MS
+    );
+    WifiTaskParams wifi_task_params{
+        .wifi = &wifi
+    };
+    constexpr UBaseType_t WIFI_TASK_PRIORITY = tskIDLE_PRIORITY + 2UL;
+    constexpr configSTACK_DEPTH_TYPE WIFI_TASK_STACK_SIZE = 2048;
 
     SX1278Config sx1278_config;
     sx1278_config.frequencyHz = 433920000;
@@ -56,6 +73,8 @@ int main( void )
         sizeof(WEB_SERVER_ROOT_CA),
         API_KEY
     );
+    // Use pico_wifi
+    https_client.setWifiManagedExternally(true);
 
     HttpsTaskParams https_task_params {
         .https_client = &https_client,
@@ -70,6 +89,12 @@ int main( void )
     if (sx1278.init(sx1278_config)) {
         printf("SX1278 detected, version: 0x%02X\n", sx1278.getVersion());
         sx1278.startReceive();
+
+        if (xTaskCreate(wifi_task, "WifiTask", WIFI_TASK_STACK_SIZE,
+            (void*)&wifi_task_params, WIFI_TASK_PRIORITY, nullptr) != pdPASS) {
+                printf("Failed to create WiFi task\n");
+                return 1;
+        }
 
         xTaskCreate(lora_receive_weather_data_task, "LoRaReceiveWeatherDataTask", LORA_RECEIVE_TASK_STACK_SIZE,
             (void*)&lora_task_params, LORA_RECEIVE_TASK_PRIORITY, nullptr);

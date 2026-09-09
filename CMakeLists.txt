@@ -4,6 +4,10 @@ set(PROJECT pico-weather-base-station)
 
 set(PICO_BOARD pico2_w CACHE STRING "Board type" FORCE)
 
+set(PICO_MBEDTLS_CONFIG_FILE
+    "${CMAKE_CURRENT_LIST_DIR}/include/mbedtls_config.h"
+)
+
 include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
 
 project(${PROJECT} C CXX ASM)
@@ -31,16 +35,19 @@ include(
 
 add_executable(${PROJECT}
     src/pico-weather-base-station.cpp
+    src/tasks/wifi-tasks.cpp
     src/tasks/lora-tasks.cpp
     src/tasks/https-tasks.cpp
 )
 
 target_include_directories(${PROJECT} PRIVATE
-    src/include
-    src/include/messages
-    src/tasks
+    ${CMAKE_CURRENT_LIST_DIR}/include
+    ${CMAKE_CURRENT_LIST_DIR}/src/include
+    ${CMAKE_CURRENT_LIST_DIR}/src/include/messages
+    ${CMAKE_CURRENT_LIST_DIR}/src/tasks
 )
 
+add_subdirectory(lib/pico-wifi)
 add_subdirectory(lib/pico-https)
 add_subdirectory(lib/pico-lora)
 
@@ -51,6 +58,7 @@ target_link_libraries(${PROJECT}
     pico_mbedtls
     pico_cyw43_arch_lwip_sys_freertos
     FreeRTOS-Kernel-Heap4
+    pico_wifi
     pico_https
     pico_lora
 )
