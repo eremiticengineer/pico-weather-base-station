@@ -4,51 +4,50 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
-#include "HttpsClient.hpp"
-#include "WeatherPayload.hpp"
-#include "WebServerCertificate.hpp"
-
 #include "secrets.hpp"
 
-#define HTTPS_TASK_PRIORITY (tskIDLE_PRIORITY + 2)
+#include "tasks/lora-tasks.hpp"
+#include "tasks/https-tasks.hpp"
 
-void https_post_task(__unused void *params) {
-    HttpsClient* pHttpsClient = static_cast<HttpsClient*>(params);
-
-    std::string payload =
-        "seq=1 temp=12.4 humidity=76.2 pressure=1008.6 "
-        "wind=8.7 gust=14.2 direction=23 rain=1.4 "
-        "lux=12500.0 battery=4.87 timestamp=1788004800";
-
-    WeatherPayload weather;
-    if (!WeatherPayload::parse(payload, weather)) {
-        printf("Invalid weather packet: %s\n", payload.c_str());
-    }
-    const std::string json = weather.toJson();
-    printf("JSON: %s\n", json.c_str());
-
-    if (!pHttpsClient->initialiseWifi(WIFI_SSID, WIFI_PASSWORD)) {
-        printf("WiFi failed: %s\n", pHttpsClient->errorMessage().c_str());
-    }
-
-    while (true) {
-        printf("posting to website...\n");
-
-        if (!pHttpsClient->post(json)) {
-            printf("POST failed: %s\n", pHttpsClient->errorMessage().c_str());
-        } else {
-            printf("POST successful: HTTP %d\n", pHttpsClient->statusCode());
-        }    
-
-        vTaskDelay(pdMS_TO_TICKS(10000));
-    }
-}
+// The lora receive task will tell the https post task to post the weather data to the server
+QueueHandle_t https_post_queue;
 
 int main( void )
 {
     stdio_init_all();
 
     sleep_ms(2000);
+
+    SX1278Config sx1278_config;
+    sx1278_config.frequencyHz = 433920000;
+    sx1278_config.bandwidth = LoRaBandwidth::BW_125_KHZ;
+    sx1278_config.codingRate = LoRaCodingRate::CR_4_5;
+    sx1278_config.spreadingFactor = 7;
+    sx1278_config.crcEnabled = true;
+    sx1278_config.preambleLength = 8;
+    sx1278_config.syncWord = 0x12;
+    // mW = 10^(txPowerDbm / 10) = 10mW
+    // dBm = 10log10(mw)
+    // +3dB ~ doubles the power, +10dB multiplies power by 10
+    sx1278_config.txPowerDbm = 10;
+
+    SX1278 sx1278(
+        lora_config::SPI,
+        lora_config::CS,
+        lora_config::RESET,
+        lora_config::SCK,
+        lora_config::MOSI,
+        lora_config::MISO
+    );
+
+    https_post_queue = xQueueCreate(8, sizeof(HttpsPostMessage));
+    LoraTaskParams lora_task_params {
+        .lora = &sx1278,
+        .https_post_queue = https_post_queue
+    };
+
+    constexpr UBaseType_t LORA_RECEIVE_TASK_PRIORITY = tskIDLE_PRIORITY + 2UL;
+    constexpr configSTACK_DEPTH_TYPE LORA_RECEIVE_TASK_STACK_SIZE = 512;
 
     HttpsClient https_client(
         SERVER,
@@ -58,9 +57,31 @@ int main( void )
         API_KEY
     );
 
-    BaseType_t result = xTaskCreate(https_post_task, "HttpsPostTask", 1024, (void*)&https_client, HTTPS_TASK_PRIORITY, nullptr);
+    HttpsTaskParams https_task_params {
+        .https_client = &https_client,
+        .https_post_queue = https_post_queue,
+        .wifi_ssid = WIFI_SSID,
+        .wifi_password = WIFI_PASSWORD
+    };
 
-    vTaskStartScheduler();
+    constexpr UBaseType_t HTTPS_TASK_PRIORITY = tskIDLE_PRIORITY + 2UL;
+    constexpr configSTACK_DEPTH_TYPE HTTPS_TASK_STACK_SIZE = 1024;
+
+    if (sx1278.init(sx1278_config)) {
+        printf("SX1278 detected, version: 0x%02X\n", sx1278.getVersion());
+        sx1278.startReceive();
+
+        xTaskCreate(lora_receive_weather_data_task, "LoRaReceiveWeatherDataTask", LORA_RECEIVE_TASK_STACK_SIZE,
+            (void*)&lora_task_params, LORA_RECEIVE_TASK_PRIORITY, nullptr);
+
+        xTaskCreate(https_post_task, "HttpsPostTask", HTTPS_TASK_STACK_SIZE,
+            (void*)&https_task_params, HTTPS_TASK_PRIORITY, nullptr);
+
+        vTaskStartScheduler();
+    }
+    else {
+        printf("SX1278 not detected\n");
+    }
 
     while (true) { tight_loop_contents(); }
 }

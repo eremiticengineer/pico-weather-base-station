@@ -31,12 +31,14 @@ include(
 
 add_executable(${PROJECT}
     src/pico-weather-base-station.cpp
-    src/WeatherPayload/WeatherPayload.cpp
+    src/tasks/lora-tasks.cpp
+    src/tasks/https-tasks.cpp
 )
 
 target_include_directories(${PROJECT} PRIVATE
-    include/
-    src/WeatherPayload
+    src/include
+    src/include/messages
+    src/tasks
 )
 
 add_subdirectory(lib/pico-https)
