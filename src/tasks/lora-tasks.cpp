@@ -144,6 +144,14 @@ void lora_receive_weather_data_task(void* pvParameters) {
                         message.json,
                         sizeof(message.json),
                         "{"
+                        "\"packetType\":%u,"
+                        "\"received\":%llu,"
+                        "\"lost\":%llu,"
+                        "\"loss\":%.2f,"
+                        "\"rssiAvg\":%.1f,"
+                        "\"rssiMin\":%d,"
+                        "\"snrAvg\":%.1f,"
+                        "\"snrMin\":%.1f,"
                         "\"timestamp\":%lu,"
                         "\"bootId\":%lu,"
                         "\"temperature\":%.1f,"
@@ -158,6 +166,14 @@ void lora_receive_weather_data_task(void* pvParameters) {
                         "\"batteryVoltage\":%.2f,"
                         "\"validSensors\":%u"
                         "}",
+                        static_cast<unsigned int>(PacketType::Weather),
+                        static_cast<unsigned long long>(stats.packetsReceived),
+                        static_cast<unsigned long long>(stats.packetsLost),
+                        stats.packetLossPercentage(),
+                        stats.averageRssi(),
+                        stats.minimumRssi,
+                        stats.averageSnr(),
+                        stats.minimumSnr,
                         static_cast<unsigned long>(weather.timestamp),
                         static_cast<unsigned long>(weather.bootId),
                         weather.temperature,
