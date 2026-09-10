@@ -7,7 +7,7 @@
 #include "HttpsClient.hpp"
 #include "WebServerCertificate.hpp"
 
-#include "HttpsPostMessage.hpp"
+#include "messages/HttpsPostMessage.hpp"
 
 struct HttpsTaskParams {
     HttpsClient* https_client;

@@ -11,7 +11,7 @@
 
 #include "LoRaPacket.hpp"
 #include "SX1278.hpp"
-#include "HttpsPostMessage.hpp"
+#include "messages/HttpsPostMessage.hpp"
 
 namespace lora_config {
     inline spi_inst_t* SPI = spi0;
