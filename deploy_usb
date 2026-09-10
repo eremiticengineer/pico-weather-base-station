@@ -1,2 +1,7 @@
-# pico2w
-cp build/pico-weather-base-station.uf2 /media/pi/RP2350
+#!/bin/bash
+
+# pico_w
+# cp build-pico_w/pico-weather-base-station.uf2 /media/pi/RP2040
+
+# pico2_w
+cp build-pico2_w/pico-weather-base-station.uf2 /media/pi/RP2350

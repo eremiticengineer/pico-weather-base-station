@@ -2,7 +2,15 @@ cmake_minimum_required(VERSION 3.13)
 
 set(PROJECT pico-weather-base-station)
 
-set(PICO_BOARD pico2_w CACHE STRING "Board type" FORCE)
+if(DEVICE STREQUAL "pico_w")
+    set(PICO_BOARD pico_w CACHE STRING "Board type" FORCE)
+elseif(DEVICE STREQUAL "pico2_w")
+    set(PICO_BOARD pico2_w CACHE STRING "Board type" FORCE)
+else()
+    message(FATAL_ERROR
+        "Unknown DEVICE='${DEVICE}'. Use pico_w or pico2_w."
+    )
+endif()
 
 set(PICO_MBEDTLS_CONFIG_FILE
     "${CMAKE_CURRENT_LIST_DIR}/include/mbedtls_config.h"
