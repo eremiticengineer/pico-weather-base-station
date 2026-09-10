@@ -43,11 +43,8 @@ int main( void )
     sx1278_config.crcEnabled = true;
     sx1278_config.preambleLength = 8;
     sx1278_config.syncWord = 0x12;
-    // mW = 10^(txPowerDbm / 10) = 10mW
-    // dBm = 10log10(mw)
-    // +3dB ~ doubles the power, +10dB multiplies power by 10
+    // Comply with OFGEM UK 433Mhz range duty cycle regulations
     sx1278_config.txPowerDbm = 10;
-
     SX1278 sx1278(
         lora_config::SPI,
         lora_config::CS,
@@ -62,7 +59,6 @@ int main( void )
         .lora = &sx1278,
         .https_post_queue = https_post_queue
     };
-
     constexpr UBaseType_t LORA_RECEIVE_TASK_PRIORITY = tskIDLE_PRIORITY + 2UL;
     constexpr configSTACK_DEPTH_TYPE LORA_RECEIVE_TASK_STACK_SIZE = 512;
 
@@ -75,38 +71,42 @@ int main( void )
     );
     // Use pico_wifi
     https_client.setWifiManagedExternally(true);
-
     HttpsTaskParams https_task_params {
         .https_client = &https_client,
         .https_post_queue = https_post_queue,
         .wifi_ssid = WIFI_SSID,
         .wifi_password = WIFI_PASSWORD
     };
-
     constexpr UBaseType_t HTTPS_TASK_PRIORITY = tskIDLE_PRIORITY + 2UL;
     constexpr configSTACK_DEPTH_TYPE HTTPS_TASK_STACK_SIZE = 1024;
 
+    // The whole point of the base station is to receive LoRa messages so check we can do that first...
     if (sx1278.init(sx1278_config)) {
         printf("SX1278 detected, version: 0x%02X\n", sx1278.getVersion());
+
         sx1278.startReceive();
 
+        // ...then ensure we can do the second reason to exist, to send data to the server
         if (xTaskCreate(wifi_task, "WifiTask", WIFI_TASK_STACK_SIZE,
-            (void*)&wifi_task_params, WIFI_TASK_PRIORITY, nullptr) != pdPASS) {
-                printf("Failed to create WiFi task\n");
-                return 1;
+            (void*)&wifi_task_params, WIFI_TASK_PRIORITY, nullptr) == pdPASS) {
+
+            xTaskCreate(lora_receive_weather_data_task, "LoRaReceiveWeatherDataTask", LORA_RECEIVE_TASK_STACK_SIZE,
+                (void*)&lora_task_params, LORA_RECEIVE_TASK_PRIORITY, nullptr);
+
+            xTaskCreate(https_post_task, "HttpsPostTask", HTTPS_TASK_STACK_SIZE,
+                (void*)&https_task_params, HTTPS_TASK_PRIORITY, nullptr);
+
+            vTaskStartScheduler();
+
+        } // if (xTaskCreate(wifi_task
+        else {
+            printf("Failed to create WiFi task\n");
         }
-
-        xTaskCreate(lora_receive_weather_data_task, "LoRaReceiveWeatherDataTask", LORA_RECEIVE_TASK_STACK_SIZE,
-            (void*)&lora_task_params, LORA_RECEIVE_TASK_PRIORITY, nullptr);
-
-        xTaskCreate(https_post_task, "HttpsPostTask", HTTPS_TASK_STACK_SIZE,
-            (void*)&https_task_params, HTTPS_TASK_PRIORITY, nullptr);
-
-        vTaskStartScheduler();
-    }
+    } // if (sx1278.init(sx1278_config))
     else {
         printf("SX1278 not detected\n");
     }
 
+    // One of the required tasks failed to start
     while (true) { tight_loop_contents(); }
 }
